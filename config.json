@@ -1,0 +1,46 @@
+# Pac-Man configuration file.
+# Lines starting with '#' are comments and are ignored by the loader.
+# The rest of the file is standard JSON. Unknown keys are ignored, and any
+# missing or invalid value is clamped to a safe default (see README).
+{
+    "highscore_filename": "highscores.json",
+
+    # Rendering
+    "cell_size": 24,
+    "fps": 60,
+
+    # Player
+    "lives": 3,
+    "player_speed": 5,
+
+    # Scoring
+    "points_per_pacgum": 10,
+    "points_per_super_pacgum": 50,
+    "points_per_ghost": 200,
+
+    # Ghosts
+    "ghost_speed": 4,
+    "frightened_duration": 8,
+    "ghost_respawn_delay": 6,
+
+    # Reproducibility: the first level uses this fixed seed, later levels
+    # are generated randomly.
+    "seed": 42,
+
+    # Per-level time limit, in seconds.
+    "level_max_time": 90,
+
+    # Levels: each entry describes one maze. The game requires at least 10.
+    "levels": [
+        {"width": 21, "height": 21, "pacgum": 42},
+        {"width": 21, "height": 21, "pacgum": 60},
+        {"width": 23, "height": 23, "pacgum": 80},
+        {"width": 23, "height": 23, "pacgum": 90},
+        {"width": 25, "height": 25, "pacgum": 100},
+        {"width": 25, "height": 25, "pacgum": 110},
+        {"width": 27, "height": 27, "pacgum": 120},
+        {"width": 27, "height": 27, "pacgum": 130},
+        {"width": 29, "height": 29, "pacgum": 140},
+        {"width": 31, "height": 31, "pacgum": 160}
+    ]
+}

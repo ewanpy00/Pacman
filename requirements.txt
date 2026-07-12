@@ -1,0 +1,16 @@
+# Runtime dependencies
+# pygame-ce (community edition) is a drop-in `import pygame` with up-to-date
+# wheels; the classic `pygame` package's font module is broken on Python 3.14.
+pygame-ce>=2.5
+
+# Development / tooling (safe to keep installed for lint targets)
+flake8>=7.0
+mypy>=1.8
+pytest>=8.0
+
+# Packaging the standalone build (see `make package` / pacman.spec)
+pyinstaller>=6.0
+
+# NOTE: the assigned maze generator is installed separately from the local
+# wheel (see the `install` target in the Makefile), not from PyPI:
+#   pip install mazegenerator-00001-py3-none-any.whl
