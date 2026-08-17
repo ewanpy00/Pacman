@@ -1,1 +1,1 @@
-"""Test suite (not graded; run with ``make test``)."""
+"""Unit tests for the Pac-Man game."""

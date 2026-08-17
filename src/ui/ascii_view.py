@@ -1,4 +1,4 @@
-"""Dependency-free text renderer: one Level frame to stdout (smoke tests)."""
+"""Plain-text rendering of a level, used by the headless demo and tests."""
 
 from __future__ import annotations
 
@@ -13,7 +13,18 @@ _EMPTY = " "
 
 
 def _cell_char(maze: Maze, level: Level, x: int, y: int) -> str:
-    """Return the glyph for a single maze cell."""
+    """Return the character standing for whatever occupies ``(x, y)``.
+
+    Args:
+        maze: The level's maze.
+        level: The level to inspect.
+        x: Column of the cell.
+        y: Row of the cell.
+
+    Returns:
+        A single character: actors take priority over pellets, which take
+        priority over the floor.
+    """
     if (x, y) == level.player.position:
         return _PLAYER
     for ghost in level.ghosts:
@@ -29,14 +40,23 @@ def _cell_char(maze: Maze, level: Level, x: int, y: int) -> str:
 
 
 def render_level(level: Level) -> str:
-    """Render one level frame as multi-line ASCII (debug view only)."""
+    """Render ``level`` as multi-line ASCII art.
+
+    Each cell takes two characters: its contents, then ``|`` when a wall
+    closes off its eastern side.
+
+    Args:
+        level: The level to draw.
+
+    Returns:
+        The drawing, with rows separated by newlines.
+    """
     maze = level.maze
     rows: list[str] = []
     for y in range(maze.height):
         chars: list[str] = []
         for x in range(maze.width):
             chars.append(_cell_char(maze, level, x, y))
-            # Draw the east wall as a separator when present.
             east = maze.is_wall_between(x, y, Direction.RIGHT)
             chars.append("|" if east else " ")
         rows.append("".join(chars))

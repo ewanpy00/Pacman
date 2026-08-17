@@ -1,6 +1,3 @@
-# Pac-Man project Makefile
-# Uses a local virtual environment (.venv) so tooling stays isolated.
-
 VENV        := .venv
 PYTHON      := $(VENV)/bin/python
 PIP         := $(VENV)/bin/pip

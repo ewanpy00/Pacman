@@ -1,4 +1,10 @@
-"""Load/validate the JSON-with-#-comments config; bad values -> defaults."""
+"""Loading, validation and clamping of the JSON game configuration.
+
+The loader never raises on a *bad value*: unknown keys are ignored and
+invalid ones are replaced or clamped, with a warning printed to stdout.
+Only problems that make the file unusable at all (missing, not JSON)
+raise :class:`ConfigError`.
+"""
 
 from __future__ import annotations
 
@@ -6,7 +12,6 @@ import json
 from dataclasses import dataclass, field
 from typing import Any
 
-# Default values used when a key is missing or invalid.
 _DEFAULTS: dict[str, Any] = {
     "highscore_filename": "highscores.json",
     "cell_size": 24,
@@ -23,7 +28,6 @@ _DEFAULTS: dict[str, Any] = {
     "level_max_time": 90,
 }
 
-# Inclusive (min, max) bounds for integer keys. Values are clamped into range.
 _BOUNDS: dict[str, tuple[int, int]] = {
     "cell_size": (8, 64),
     "fps": (15, 240),
@@ -39,20 +43,21 @@ _BOUNDS: dict[str, tuple[int, int]] = {
     "level_max_time": (5, 3600),
 }
 
-# A maze must be at least this large or the generator refuses to embed its
-# '42' pattern and warns on stderr.
 _MIN_LEVEL_SIZE = 15
 _MAX_LEVEL_SIZE = 60
 _MIN_LEVELS = 10
 
+GHOST_MODES = ("classic", "chase", "random")
+_DEFAULTS["ghost_mode"] = "classic"
+
 
 class ConfigError(Exception):
-    """Raised when the config file cannot be read or parsed at all."""
+    """Raised when the configuration file cannot be read or parsed."""
 
 
 @dataclass
 class LevelConfig:
-    """Parameters describing a single maze/level."""
+    """Size and pellet budget of a single level."""
 
     width: int
     height: int
@@ -61,7 +66,7 @@ class LevelConfig:
 
 @dataclass
 class Config:
-    """Validated config: every field present and within range."""
+    """Fully validated game settings, with safe defaults for every key."""
 
     highscore_filename: str = _DEFAULTS["highscore_filename"]
     cell_size: int = _DEFAULTS["cell_size"]
@@ -76,26 +81,55 @@ class Config:
     ghost_respawn_delay: int = _DEFAULTS["ghost_respawn_delay"]
     seed: int = _DEFAULTS["seed"]
     level_max_time: int = _DEFAULTS["level_max_time"]
+    ghost_mode: str = _DEFAULTS["ghost_mode"]
     levels: list[LevelConfig] = field(default_factory=list)
 
 
 def _warn(message: str) -> None:
-    """Log a non-fatal configuration problem to the user."""
+    """Print a non-fatal configuration warning."""
     print(f"[config] warning: {message}")
 
 
 def strip_comments(raw: str) -> str:
-    """Strip leading-``#`` comment lines (``#`` inside strings survives)."""
+    """Remove ``#``, ``//`` and ``/* ... */`` comments from JSON text.
+
+    Comments are only recognised when they start a line, so a ``#`` or a
+    ``//`` inside a JSON string value is preserved.
+
+    Args:
+        raw: Raw text of the configuration file.
+
+    Returns:
+        The same text with every comment line removed.
+    """
     lines: list[str] = []
+    in_block = False
     for line in raw.splitlines():
-        if line.lstrip().startswith("#"):
+        stripped = line.strip()
+        if in_block:
+            if stripped.endswith("*/"):
+                in_block = False
+            continue
+        if stripped.startswith("/*"):
+            if not stripped.endswith("*/") or stripped == "/*":
+                in_block = True
+            continue
+        if stripped.startswith("#") or stripped.startswith("//"):
             continue
         lines.append(line)
     return "\n".join(lines)
 
 
 def _coerce_int(data: dict[str, Any], key: str) -> int:
-    """Return a bounded int for ``key``, falling back to its default."""
+    """Read an integer key, falling back to the default and clamping it.
+
+    Args:
+        data: The decoded configuration mapping.
+        key: Name of the key to read; must appear in ``_BOUNDS``.
+
+    Returns:
+        A valid integer inside the key's allowed range.
+    """
     default = int(_DEFAULTS[key])
     value = data.get(key, default)
     if not isinstance(value, int) or isinstance(value, bool):
@@ -111,7 +145,7 @@ def _coerce_int(data: dict[str, Any], key: str) -> int:
 
 
 def _coerce_filename(data: dict[str, Any]) -> str:
-    """Return a safe highscore filename."""
+    """Return a usable highscore filename, or the default one."""
     default = str(_DEFAULTS["highscore_filename"])
     value = data.get("highscore_filename", default)
     if not isinstance(value, str) or not value.strip():
@@ -120,8 +154,25 @@ def _coerce_filename(data: dict[str, Any]) -> str:
     return value
 
 
+def _coerce_ghost_mode(data: dict[str, Any]) -> str:
+    """Return a known ghost mode name, or the default one."""
+    default = str(_DEFAULTS["ghost_mode"])
+    value = data.get("ghost_mode", default)
+    if not isinstance(value, str) or value not in GHOST_MODES:
+        _warn(f"'ghost_mode' must be one of {GHOST_MODES}; using '{default}'")
+        return default
+    return value
+
+
 def _coerce_levels(data: dict[str, Any]) -> list[LevelConfig]:
-    """Return a validated, padded list of at least ``_MIN_LEVELS`` levels."""
+    """Build the level list, padding it up to the required minimum.
+
+    Args:
+        data: The decoded configuration mapping.
+
+    Returns:
+        At least ``_MIN_LEVELS`` validated level descriptions.
+    """
     raw = data.get("levels")
     levels: list[LevelConfig] = []
     if not isinstance(raw, list) or not raw:
@@ -132,7 +183,6 @@ def _coerce_levels(data: dict[str, Any]) -> list[LevelConfig]:
             _warn(f"level #{index} is not an object; skipped")
             continue
         levels.append(_coerce_level(entry, index))
-    # Pad up to the minimum number of levels required by the subject.
     while len(levels) < _MIN_LEVELS:
         size = min(_MAX_LEVEL_SIZE, 21 + 2 * len(levels))
         levels.append(LevelConfig(width=size, height=size, pacgum=42))
@@ -140,8 +190,18 @@ def _coerce_levels(data: dict[str, Any]) -> list[LevelConfig]:
 
 
 def _coerce_level(entry: dict[str, Any], index: int) -> LevelConfig:
-    """Validate a single level entry."""
+    """Validate one level entry.
+
+    Args:
+        entry: The raw level object from the config file.
+        index: Position of the level, used in warning messages.
+
+    Returns:
+        A level whose size is clamped to the supported range and whose
+        pellet count is at least one.
+    """
     def bounded(key: str, fallback: int) -> int:
+        """Read one level key, clamping sizes to the supported range."""
         value = entry.get(key, fallback)
         if not isinstance(value, int) or isinstance(value, bool):
             _warn(f"level #{index} '{key}' invalid; using {fallback}")
@@ -160,7 +220,16 @@ def _coerce_level(entry: dict[str, Any], index: int) -> LevelConfig:
 
 
 def parse_config(data: dict[str, Any]) -> Config:
-    """Build a validated :class:`Config` from a raw JSON-decoded dict."""
+    """Turn a decoded JSON mapping into a validated :class:`Config`.
+
+    Unknown keys are ignored; invalid ones are replaced or clamped.
+
+    Args:
+        data: The decoded configuration mapping.
+
+    Returns:
+        A configuration that is safe to run the game with.
+    """
     if not isinstance(data, dict):
         _warn("top-level config is not an object; using all defaults")
         data = {}
@@ -178,12 +247,24 @@ def parse_config(data: dict[str, Any]) -> Config:
         ghost_respawn_delay=_coerce_int(data, "ghost_respawn_delay"),
         seed=_coerce_int(data, "seed"),
         level_max_time=_coerce_int(data, "level_max_time"),
+        ghost_mode=_coerce_ghost_mode(data),
         levels=_coerce_levels(data),
     )
 
 
 def load_config(path: str) -> Config:
-    """Load + decomment + validate a config file (raises ConfigError)."""
+    """Read and validate the configuration file at ``path``.
+
+    Args:
+        path: Path to a ``.json`` configuration file.
+
+    Returns:
+        The validated configuration.
+
+    Raises:
+        ConfigError: If the path is not a ``.json`` file, cannot be read,
+            or does not contain valid JSON.
+    """
     if not path.endswith(".json"):
         raise ConfigError(f"'{path}' is not a .json file")
     try:

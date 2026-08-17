@@ -14,7 +14,15 @@ def _usage() -> None:
 
 
 def _load(argv: list[str]) -> Config | None:
-    """Validate CLI args and load the config, or return ``None`` on error."""
+    """Validate the command line and load the configuration.
+
+    Args:
+        argv: The full argument vector, including the program name.
+
+    Returns:
+        The loaded configuration, or None after printing the reason it
+        could not be loaded.
+    """
     if len(argv) != 2:
         print("error: exactly one argument (a .json config file) is required")
         _usage()
@@ -27,7 +35,14 @@ def _load(argv: list[str]) -> Config | None:
 
 
 def main(argv: list[str]) -> int:
-    """Program entry point. Returns a process exit code."""
+    """Load the configuration and run the game.
+
+    Args:
+        argv: The full argument vector, including the program name.
+
+    Returns:
+        A process exit code: ``0`` on success, ``1`` on any failure.
+    """
     config = _load(argv)
     if config is None:
         return 1

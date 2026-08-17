@@ -1,4 +1,9 @@
-"""No-display demo: ticks the first level and prints a frame + summary."""
+"""Text-mode fallback used when pygame is unavailable.
+
+It proves that config loading, maze generation and the simulation all
+work even on a machine with no display, which makes it a useful smoke
+test during setup.
+"""
 
 from __future__ import annotations
 
@@ -12,7 +17,15 @@ _DEMO_DT = 1.0 / 60.0
 
 
 def run_headless_demo(config: Config) -> int:
-    """Simulate the first level headlessly and report the result."""
+    """Print the first level and simulate a few seconds of play.
+
+    Args:
+        config: Validated game settings.
+
+    Returns:
+        A process exit code: ``0`` on success, ``1`` if the first level
+        could not be generated.
+    """
     highscores = HighScoreStore(config.highscore_filename)
     game = Game(config, highscores)
     game.start_new_game()

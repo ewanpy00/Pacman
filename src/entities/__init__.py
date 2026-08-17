@@ -1,4 +1,4 @@
-"""Game entities: the player and the ghosts."""
+"""Maze actors: the shared base entity, the player and the ghosts."""
 
 from .entity import Entity
 from .player import Player

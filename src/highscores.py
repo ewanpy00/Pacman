@@ -1,4 +1,9 @@
-"""Top-10 highscores in a JSON file; a bad/missing file gives empty table."""
+"""Persistent top-ten highscore table, stored as a JSON file.
+
+Every read is defensive: a missing, unreadable, malformed or partly
+corrupt file yields an empty (or partial) table rather than an error, so
+a bad file can never stop the game from starting.
+"""
 
 from __future__ import annotations
 
@@ -19,7 +24,15 @@ class Score:
 
 
 def sanitize_name(name: str) -> str:
-    """Keep alnum/spaces, cap at 10 chars; empty -> ``AAA``."""
+    """Reduce ``name`` to the characters the subject allows.
+
+    Args:
+        name: Raw name as typed by the player.
+
+    Returns:
+        Up to ten alphanumeric-or-space characters, or ``"AAA"`` when
+        nothing usable is left.
+    """
     cleaned = "".join(
         ch for ch in name if ch.isalnum() or ch == " ")
     cleaned = cleaned.strip()[:MAX_NAME_LENGTH]
@@ -27,21 +40,25 @@ def sanitize_name(name: str) -> str:
 
 
 class HighScoreStore:
-    """Loads, updates and persists the top-10 highscores."""
+    """The top-ten table, loaded on creation and saved on demand."""
 
     def __init__(self, path: str) -> None:
-        """Create a store backed by the file at ``path`` and load it."""
+        """Load the table from ``path``, starting empty if unreadable.
+
+        Args:
+            path: JSON file backing the table.
+        """
         self._path = path
         self._scores: list[Score] = []
         self.load()
 
     @property
     def scores(self) -> list[Score]:
-        """Return the current top scores, highest first."""
+        """A copy of the table, best score first."""
         return list(self._scores)
 
     def load(self) -> None:
-        """Load scores from disk, tolerating any file/format error."""
+        """Re-read the table from disk, warning but not raising on error."""
         try:
             with open(self._path, "r", encoding="utf-8") as handle:
                 data = json.load(handle)
@@ -56,7 +73,17 @@ class HighScoreStore:
         self._scores = self._parse(data)
 
     def _parse(self, data: Any) -> list[Score]:
-        """Turn decoded JSON into a sorted, trimmed list of valid scores."""
+        """Turn decoded JSON into a sorted, validated table.
+
+        Entries that are not well-formed objects with a string name and a
+        non-negative integer score are skipped individually.
+
+        Args:
+            data: Whatever the JSON file decoded to.
+
+        Returns:
+            At most ``MAX_ENTRIES`` scores, best first.
+        """
         if not isinstance(data, list):
             print("[highscores] warning: file is not a list; ignoring")
             return []
@@ -77,7 +104,7 @@ class HighScoreStore:
         return parsed[:MAX_ENTRIES]
 
     def qualifies(self, points: int) -> bool:
-        """Return whether ``points`` would make the top-10 table."""
+        """Return whether ``points`` would make it into the table."""
         if points < 0:
             return False
         if len(self._scores) < MAX_ENTRIES:
@@ -85,7 +112,12 @@ class HighScoreStore:
         return points > self._scores[-1].points
 
     def add(self, name: str, points: int) -> None:
-        """Insert a new score (sanitising inputs) and keep the top 10."""
+        """Insert a score, keeping the table sorted and capped at ten.
+
+        Args:
+            name: Player name; sanitised before being stored.
+            points: Score to record; negative values become zero.
+        """
         safe_points = max(0, int(points))
         entry = Score(sanitize_name(name), safe_points)
         self._scores.append(entry)
@@ -93,7 +125,7 @@ class HighScoreStore:
         self._scores = self._scores[:MAX_ENTRIES]
 
     def save(self) -> None:
-        """Persist scores to disk, tolerating write errors."""
+        """Write the table back to disk, warning but not raising on error."""
         payload = [{"name": s.name, "points": s.points}
                    for s in self._scores]
         try:

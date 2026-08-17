@@ -1,36 +1,40 @@
-# Pac-Man configuration file.
-# Lines starting with '#' are comments and are ignored by the loader.
-# The rest of the file is standard JSON. Unknown keys are ignored, and any
-# missing or invalid value is clamped to a safe default (see README).
+/*
+ * Pac-Man configuration.
+ *
+ * Comments are supported on their own lines in three styles: hash,
+ * double-slash, and C-style blocks like this one. Unknown keys are
+ * ignored, and any missing or out-of-range value is clamped to a safe
+ * default with a warning.
+ */
 {
     "highscore_filename": "highscores.json",
 
-    # Rendering
+    # Display
     "cell_size": 24,
     "fps": 60,
 
-    # Player
+    // Player
     "lives": 3,
     "player_speed": 5,
 
-    # Scoring
     "points_per_pacgum": 10,
     "points_per_super_pacgum": 50,
     "points_per_ghost": 200,
 
-    # Ghosts
+    // Ghosts. Keep ghost_speed below player_speed, otherwise a ghost on
+    // your tail can never be shaken off.
     "ghost_speed": 4,
     "frightened_duration": 8,
     "ghost_respawn_delay": 6,
 
-    # Reproducibility: the first level uses this fixed seed, later levels
-    # are generated randomly.
+    # Level 1 uses this seed; every later level is generated randomly.
     "seed": 42,
 
-    # Per-level time limit, in seconds.
     "level_max_time": 90,
 
-    # Levels: each entry describes one maze. The game requires at least 10.
+    # Default ghost AI: classic / chase / random (also pickable in game).
+    "ghost_mode": "classic",
+
     "levels": [
         {"width": 21, "height": 21, "pacgum": 42},
         {"width": 21, "height": 21, "pacgum": 60},
